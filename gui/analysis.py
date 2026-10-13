@@ -117,6 +117,8 @@ class Analysis(QObject):
         self.odf_variant = "D"
         # 通道 A 的可调项（侧栏"峰相对阈值"）——改它只重算 ODF 概览，不碰频谱
         self.a_opts = {"rel_gamma": 0.30}
+        # 变体 F（音高显著性）：复音数上限。实测 >10 会让选择本身不稳定
+        self.f_opts = {"n_harm": 8, "top_notes": 10, "rel_gamma": 0.30}
 
         self._sig = _Sig()
         self._sig.done.connect(self._on_ov_done)
@@ -156,6 +158,11 @@ class Analysis(QObject):
         self.a_opts["rel_gamma"] = float(gamma)
         self._ov_odf.pop("E", None)
         self._submit("ov_odf", lambda: ("E", self._build_ov_odf("E")))
+
+    def set_f_notes(self, top_notes: int):
+        self.f_opts["top_notes"] = int(top_notes)
+        self._ov_odf.pop("F", None)
+        self._submit("ov_odf", lambda: ("F", self._build_ov_odf("F")))
 
     def set_odf_variant(self, variant: str):
         if variant == self.odf_variant:
@@ -286,6 +293,8 @@ class Analysis(QObject):
                            hop_ms=ODF_HOP_MS)
         elif variant == "E":
             r = odf.channel_a(self.samples, sr, hop_ms=ODF_HOP_MS, **self.a_opts)
+        elif variant == "F":
+            r = odf.pitch_salience(self.samples, sr, hop_ms=ODF_HOP_MS, **self.f_opts)
         else:
             r = odf.perbin(self.samples, sr, use_reassign=False, maxfilt=17,
                            hop_ms=ODF_HOP_MS)

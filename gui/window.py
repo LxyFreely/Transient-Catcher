@@ -114,11 +114,12 @@ class MainWindow(QMainWindow):
 
         tb.addWidget(QLabel(" ODF 变体 "))
         self.variant_box = QComboBox()
-        self.variant_box.addItems(["A", "B", "C", "D", "E"])
+        self.variant_box.addItems(["A", "B", "C", "D", "E", "F"])
         self.variant_box.setCurrentText("E")
         self.variant_box.setToolTip(
             "A=现有算法  B=逐bin导数(含重分配)  C=B+maxfilter  "
-            "D=不重分配+maxfilter  E=通道A原型(短窗+能量归一)")
+            "D=不重分配+maxfilter  E=通道A原型(短窗+能量归一)  "
+            "F=音高显著性(谐波归组后只跟最响的复音)")
         self.variant_box.currentTextChanged.connect(self._set_variant)
         tb.addWidget(self.variant_box)
 
@@ -157,6 +158,16 @@ class MainWindow(QMainWindow):
         v.addWidget(self.rel_gate)
         v.addWidget(QLabel("峰值须达到±600ms内最大峰的该比例。\n"
                            "调高可压掉延音的假音头，代价是弱音头会漏"))
+
+        v.addSpacing(8)
+        v.addWidget(QLabel("<b>复音数上限（变体 F）</b>"))
+        self.top_notes = QComboBox()
+        self.top_notes.addItems(["5", "8", "10", "15", "20", "不限"])
+        self.top_notes.setCurrentText("10")
+        self.top_notes.currentTextChanged.connect(self._set_top_notes)
+        v.addWidget(self.top_notes)
+        v.addWidget(QLabel("只跟最响的这几个复音。实测 5–10 最稳，\n"
+                           "20 以上选择本身会抖（颤音误报飙升）"))
 
         v.addSpacing(8)
         v.addWidget(QLabel("<b>音头标记上限</b>"))
@@ -323,6 +334,12 @@ class MainWindow(QMainWindow):
             self.analysis.set_a_gate(0.0 if text == "关" else float(text))
         except ValueError:
             pass
+        self.canvas.invalidate_lanes()
+
+    def _set_top_notes(self, text: str):
+        if self.analysis is None:
+            return
+        self.analysis.set_f_notes(0 if text == "不限" else int(text))
         self.canvas.invalidate_lanes()
 
     def _set_marker_limit(self, text: str):

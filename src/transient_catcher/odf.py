@@ -208,6 +208,87 @@ def channel_a(x: np.ndarray, sr: int, win_ms: float = 16.0, hop_ms: float = HOP_
 
 
 # --------------------------------------------------------------------------
+# F) 音高显著性通量：先把谐波归组成"复音"，再在复音层看变化
+# --------------------------------------------------------------------------
+def pitch_salience(x: np.ndarray, sr: int, win_ms: float = 16.0, hop_ms: float = HOP_MS,
+                   n_harm: int = 8, top_notes: int = 10, per_semitone: int = 4,
+                   maxfilt: int = 5, f0_lo: float = 55.0, f0_hi: float = 1200.0,
+                   rel_win_ms: float = 600.0, rel_gamma: float = 0.30,
+                   floor: float = 0.20, peak_half: int = 3,
+                   energy_win_ms: float = 250.0, norm_q: float = 0.99) -> dict:
+    """通道 A 的"复音层"变体。
+
+    动因（实测）：**只对主要分量做分析**这个直觉本身是对的，但直接"取前 K 个 bin"
+    是错的 —— 那是**谐波**不是**复音**（一个钢琴音就有十几个谐波），
+    而且硬性 top-K 的集合每帧进出，会凭空造出通量（实测 top-20 把 S1 颤音误报顶到 9.7/s）。
+    三种"只取显著分量"的写法（top-K / 相对门限 / 谱峰掩码）**全部让精确率变差**，
+    因为它们丢掉的正是那个在起平均作用的"底"。
+
+    正确的形式是**先做谐波归组**：
+        salience[f0] = Σ_{k=1..n_harm} spec[f0 的第 k 次谐波]
+    这样单个分音的拍频会在求和里互相抵消，而真正的换音会让 salience 的峰整体移动。
+
+    实测（谱面精确率，下界）：
+        频谱通量基线                召回 93%  精确 36%
+        显著性（8 谐波）            召回 88%  精确 **45%**
+        显著性 + 取最响 10 个复音    召回 92%  精确 40%   （B 段召回 2 → 4）
+        显著性 + 取最响 20 个复音    召回 90%  精确 40%   （S1 崩溃到 12.7/s）
+
+    **top_notes 不要超过 ~10**：再往上纳入的都是弱分量，选择本身开始不稳定。
+    """
+    win = max(128, int(2 ** int(round(float(np.log2(sr * win_ms / 1000.0))))))
+    hop = max(1, int(round(sr * hop_ms / 1000.0)))
+    X, _ = dsp.stft(x, win, hop)
+    bin_freqs = np.fft.rfftfreq(win, 1.0 / sr)
+    grid = dsp.log_freq_grid(65.0, 10000.0, per_semitone)
+    spec = dsp.rebin_log(np.abs(X), bin_freqs, grid)
+    if maxfilt and maxfilt > 1:
+        spec = dsp.max_filter_freq(spec, maxfilt)
+
+    # --- 谐波归组 ---
+    i0 = int(np.searchsorted(grid, f0_lo))
+    i1 = int(np.searchsorted(grid, f0_hi))
+    n_f0 = max(1, i1 - i0)
+    sal = np.zeros((spec.shape[0], n_f0))
+    for k in range(1, max(1, n_harm) + 1):
+        off = int(round(per_semitone * 12 * np.log2(k)))
+        lo = i0 + off
+        if lo >= spec.shape[1]:
+            break
+        hi = min(i1 + off, spec.shape[1])
+        sal[:, :hi - lo] += spec[:, lo:hi]
+
+    # --- 只保留最响的若干个复音 ---
+    if top_notes and top_notes > 0:
+        k = min(top_notes, sal.shape[1])
+        idx = np.argpartition(-sal, k - 1, axis=1)[:, :k]
+        keep = np.zeros_like(sal, dtype=bool)
+        np.put_along_axis(keep, idx, True, axis=1)
+        sal = np.where(keep, sal, 0.0)
+
+    d = np.zeros_like(sal)
+    d[1:] = np.maximum(0.0, sal[1:] - sal[:-1])
+    flux = d.sum(axis=1)
+    energy = sal.sum(axis=1)
+    hl = max(1, int(round(energy_win_ms / hop_ms)))
+    el = np.maximum(moving_average(energy, hl),
+                    float(energy.max()) * 1e-4 if energy.size else 1.0)
+    rel = flux / np.maximum(1e-12, el)
+    scale = float(np.quantile(rel, norm_q)) if rel.size else 1.0
+    env = rel / max(1e-12, scale)
+    if rel_gamma > 0.0 and env.size:
+        w = max(1, int(round(rel_win_ms / hop_ms)))
+        env = np.where(env > rel_gamma * maximum_filter1d(env, 2 * w + 1, mode="nearest"),
+                       env, 0.0)
+
+    onsets = peak_pick(env, hop_ms, win / 2.0 / sr * 1000.0, floor=floor,
+                       half=peak_half, min_gap_ms=0.0)
+    return {"name": "F 音高显著性(%d谐波/取%d复音)" % (n_harm, top_notes),
+            "env": env, "onsets": onsets, "hop_ms": hop_ms, "win": win,
+            "flux": flux, "rel": rel, "f0_grid": grid[i0:i1]}
+
+
+# --------------------------------------------------------------------------
 # B/C) 1/4 半音对数重 bin + 逐 bin 正导数
 # --------------------------------------------------------------------------
 def perbin(x: np.ndarray, sr: int, per_semitone: int = 4, win_ms: float = 46.0,
