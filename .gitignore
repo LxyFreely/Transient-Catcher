@@ -1,0 +1,8 @@
+# 跑出来的产物，不入库
+out/
+__pycache__/
+*.pyc
+
+# 编辑器
+.vscode/
+.idea/
