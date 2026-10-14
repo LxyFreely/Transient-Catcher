@@ -25,7 +25,10 @@ FLAC = r"C:\Users\11952\Downloads\HyuN - Infinity Heaven.flac"
 CHART = (r"C:\Users\11952\AppData\Roaming\RhyDive\Library\songs"
          r"\hyun-infinity-heaven-891345-f12b4c27\assets"
          r"\HyuN - Infinity Heaven (Niva) [Ad Infinitum].osu")
-TOL = 60.0          # 匹配容差 ms
+# 匹配容差。注意这里的 det / ref 都是**秒**（因为按 10 s 分桶），
+# 所以容差必须也是秒。原来写 TOL = 60.0 而注释说是 ms，实际等于 60 秒 ——
+# 于是"任何检出都能匹配任何音符"，召回率永远是 100%。这是个假数字。
+TOL = 0.060         # 60 ms
 
 
 def parse_osu(path):
@@ -76,7 +79,8 @@ def main():
     det = np.asarray([t / 1000.0 for t, _ in r["onsets"]], dtype=np.float64)
     ref_s = ref / 1000.0
 
-    print("谱面音符 %d 个 ｜ 检出 %d 个 ｜ 时长 %.1f s" % (len(ref_s), len(det), dur))
+    print("谱面音符 %d 个 ｜ 检出 %d 个 ｜ 时长 %.1f s ｜ 容差 %.0f ms"
+          % (len(ref_s), len(det), dur, TOL * 1000.0))
     print("=" * 88)
     print("%-12s %8s %8s %8s %8s %8s" % ("区间(s)", "谱面", "检出", "命中", "召回", "精确"))
     print("-" * 88)

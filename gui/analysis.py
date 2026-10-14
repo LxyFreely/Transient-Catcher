@@ -119,6 +119,11 @@ class Analysis(QObject):
         self.a_opts = {"rel_gamma": 0.30}
         # 变体 F（音高显著性）：复音数上限。实测 >10 会让选择本身不稳定
         self.f_opts = {"n_harm": 8, "top_notes": 10, "rel_gamma": 0.30}
+        # 多链路取交集（变体下拉里的 A∩E / A∩E∩F）的匹配容差。
+        # 注意：这里的 **ms** 只是给人看的，_ov_odf 里存的时刻是**秒**
+        # （_build_ov_odf 把 onsets 的 ms 除了 1000），用之前必须 /1000。
+        # 忘了除会变成"20 秒容差"，交集退化成空操作 —— 实测就是这么踩到的。
+        self.intersect_tol_ms = 20.0
 
         self._sig = _Sig()
         self._sig.done.connect(self._on_ov_done)
@@ -282,6 +287,8 @@ class Analysis(QObject):
         return None if img is None else self._normalize(img)
 
     def _build_ov_odf(self, variant: str):
+        if "∩" in variant:
+            return self._build_intersection(variant)
         sr = self.sr
         if variant == "A":
             r = odf.rhydive_like(self.samples, sr, hop_ms=ODF_HOP_MS)
@@ -301,6 +308,43 @@ class Analysis(QObject):
         ts = np.arange(len(r["env"])) * (r["hop_ms"] / 1000.0)
         ev = np.asarray([t / 1000.0 for t, _ in r["onsets"]], dtype=np.float64)
         return (ts, np.asarray(r["env"], dtype=np.float64), ev)
+
+    def _build_intersection(self, variant: str):
+        """多链路取交集（变体下拉里的 A∩E / A∩E∩F）。
+
+        动因（docs/06-pitfalls.md A16）：误报与命中的**强度完全一样**，
+        所以任何幅度阈值都分不开；82% 的误报只是音符自身衰减 / 拍频 / 共鸣
+        产生的谱变化。不同统计量对「真起音」的响应一致、对「衰减涟漪」的
+        响应各不相同，所以取交集正好滤掉后者。
+
+        实测（20 ms 容差）：A∩E 在 夜航星 上把误报从 2014 降到 1119（-44%），
+        只损失 21% 的真阳性；F1 在 夜航星 与 Infinity Heaven 上都高于 A 单独。
+        """
+        parts = [p for p in variant.split("∩") if p]
+        dets, env_ts, env = [], None, None
+        for p in parts:
+            ts, e, d = self._build_ov_odf(p)
+            dets.append(d)
+            if env is None:
+                env_ts, env = ts, e      # 曲线用第一条链路的，标记才是交集
+        keep = dets[0]
+        for d in dets[1:]:
+            if keep.size == 0 or d.size == 0:
+                keep = np.zeros(0)
+                break
+            keep = keep[self._near(d, keep, self.intersect_tol_ms / 1000.0)]
+        return (env_ts, env, keep)
+
+    @staticmethod
+    def _near(ref, a, tol):
+        """a 中每个元素在 ref 的 ±tol 内是否有邻居。"""
+        ref = np.asarray(ref, dtype=np.float64)
+        a = np.asarray(a, dtype=np.float64)
+        if ref.size == 0 or a.size == 0:
+            return np.zeros(a.size, dtype=bool)
+        lo = np.searchsorted(ref, a - tol)
+        hi = np.searchsorted(ref, a + tol, side="right")
+        return hi > lo
 
     # ---------------- 画布接口（永不阻塞） ----------------
     def envelope(self, t0, t1, cols):
@@ -393,6 +437,13 @@ class Analysis(QObject):
         ea = int(np.searchsorted(ev, t0 - 0.05))
         eb = int(np.searchsorted(ev, t1 + 0.05))
         return (ts[a:b], env[a:b], ev[ea:eb])
+
+    def onset_times(self, variant: str):
+        """当前变体已算好的音头时刻（秒）；还没算完返回 None。"""
+        d = self._ov_odf.get(variant)
+        if d is None:
+            return None
+        return np.asarray(d[2], dtype=np.float64)
 
     def close(self):
         self._fineWorker.stop()

@@ -76,34 +76,36 @@ def main():
         r_c = odf.perbin(x, sr, use_reassign=True, maxfilt=MAXF)
         r_d = odf.perbin(x, sr, use_reassign=False, maxfilt=MAXF)
         r_e = odf.channel_a(x, sr)
-        ranks.append((s, r_a, r_b, r_c, r_d, r_e))
+        r_f = odf.pitch_salience(x, sr)
+        ranks.append((s, r_a, r_b, r_c, r_d, r_e, r_f))
 
     print("=" * 104)
     print("P0 指标表   A=现有算法  B=逐bin导数(含重分配)  C=B+maxfilter  D=不重分配+maxfilter")
     print("=" * 104)
-    print("%-22s %5s %4s %4s %4s %4s %4s %10s %10s %10s %10s" % (
-        "信号", "预期", "A", "B", "C", "D", "E",
+    print("%-22s %5s %4s %4s %4s %4s %4s %4s %10s %10s %10s %10s" % (
+        "信号", "预期", "A", "B", "C", "D", "E", "F",
         "A误报/秒", "B误报/秒", "C误报/秒", "D误报/秒"))
-    print("-" * 104)
-    for s, ra, rb, rc, rd, re_ in ranks:
-        print("%-22s %5d %4d %4d %4d %4d %4d %10s %10s %10s %10s" % (
+    print("-" * 110)
+    for s, ra, rb, rc, rd, re_, rf in ranks:
+        print("%-22s %5d %4d %4d %4d %4d %4d %4d %10s %10s %10s %10s" % (
             s["name"], s["expect"], len(ra["onsets"]), len(rb["onsets"]),
-            len(rc["onsets"]), len(rd["onsets"]), len(re_["onsets"]),
+            len(rc["onsets"]), len(rd["onsets"]), len(re_["onsets"]), len(rf["onsets"]),
             fmt(fp_per_sec(ra["onsets"], s["fp_region_ms"])),
             fmt(fp_per_sec(rb["onsets"], s["fp_region_ms"])),
             fmt(fp_per_sec(rc["onsets"], s["fp_region_ms"])),
             fmt(fp_per_sec(rd["onsets"], s["fp_region_ms"]))))
     print("=" * 104)
-    for s, ra, rb, rc, rd, re_ in ranks:
+    for s, ra, rb, rc, rd, re_, rf in ranks:
         print("%-22s D=%s" % (s["name"], [round(t) for t, _ in rd["onsets"]][:10]))
         print("%-22s E=%s" % ("", [round(t) for t, _ in re_["onsets"]][:12]))
+        print("%-22s F=%s" % ("", [round(t) for t, _ in rf["onsets"]][:12]))
     print("\n真值：S0/S1 起音 300ms；S2 台阶 1000ms；S3 同音反复 250/350/410/457ms；"
           "S4 32分 250…578ms；S5 连奏 350/970/1590/2210ms")
 
     colors = {"A": "#2563eb", "B": "#ea580c", "C": "#a855f7", "D": "#16a34a",
               "E": "#0ea5e9"}
     fig, axes = plt.subplots(len(ranks), 1, figsize=(14, 17))
-    for ax, (s, ra, rb, rc, rd, re_) in zip(axes, ranks):
+    for ax, (s, ra, rb, rc, rd, re_, rf) in zip(axes, ranks):
         ta = np.arange(len(ra["env"])) * ra["hop_ms"] / 1000.0
         tb = np.arange(len(rb["env"])) * rb["hop_ms"] / 1000.0
         ax.plot(ta, norm(ra["env"]), lw=1.6, color=colors["A"], label=ra["name"])
@@ -112,6 +114,8 @@ def main():
         ax.plot(tb, norm(rd["env"]), lw=1.2, color=colors["D"], label=rd["name"])
         ax.plot(np.arange(len(re_["env"])) * re_["hop_ms"] / 1000.0,
                 norm(re_["env"]), lw=1.6, color="#0ea5e9", label=re_["name"])
+        hn = np.arange(len(rf["env"])) * rf["hop_ms"] / 1000.0
+        ax.plot(hn, norm(rf["env"]), lw=1.4, color="#db2777", label=rf["name"])
         for gt in s["truth_ms"]:
             ax.axvline(gt / 1000.0, color="#111827", ls="--", lw=0.9, alpha=0.5)
         if s["fp_region_ms"]:

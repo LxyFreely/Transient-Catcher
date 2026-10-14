@@ -22,3 +22,5 @@ dependencies:
   - numba>=0.59
   - soundfile>=0.12
   - pyside6>=6.6
+  # mido 只用于 scripts/midi_*.py（读 MIDI 造测试集），纯 Python，不进算法。
+  - mido>=1.3

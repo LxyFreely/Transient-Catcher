@@ -41,10 +41,14 @@ RhyDive 是一款没有谱面的娱乐性音游：玩家对着歌曲的节奏敲
 
 | 你是 | 从这里开始 |
 |---|---|
+| **刚接手 / 上下文被压缩过** | **[docs/00-status.md](docs/00-status.md)** —— 现状、参数、数字、待办，**读这一份就够** |
+| **要改核心结构** | **[docs/06-pitfalls.md](docs/06-pitfalls.md)** —— 先读，每条都是付过时间代价的 |
 | **AI 编码助手** | [AGENTS.md](AGENTS.md) —— 阅读顺序、术语表、接口契约、硬约束 |
-| 只想看结论 | [docs/01-analysis.md](docs/01-analysis.md) → [docs/02-design.md](docs/02-design.md) |
+| 想看问题定义 | [docs/01-analysis.md](docs/01-analysis.md) |
+| 想看方案 | [docs/02-design.md](docs/02-design.md) |
 | 想自己验证 | [docs/03-validation.md](docs/03-validation.md) |
-| 想看依据 | [docs/04-references.md](docs/04-references.md) |
+| 想看全部实测数据 | [docs/05-p0-results.md](docs/05-p0-results.md)（F1–F13） |
+| 想看文献依据 | [docs/04-references.md](docs/04-references.md) |
 
 ## 当前状态
 
@@ -61,7 +65,8 @@ RhyDive 是一款没有谱面的娱乐性音游：玩家对着歌曲的节奏敲
 | P3 · 融合 | 未开始 | — |
 | **P4 · 测试 GUI** | **可用** | [gui/](gui/) · 规格 [docs/03-validation.md](docs/03-validation.md) 第 4 节 |
 | **真实素材回归** | **已暴露关键缺陷** | [scripts/real_infinity.py](scripts/real_infinity.py) · 结论 [docs/05-p0-results.md](docs/05-p0-results.md) 第 8 节 |
-| **谱面参照评估** | 完成（召回 100%） | [scripts/eval_chart.py](scripts/eval_chart.py) · 结论第 10 节 |
+| **谱面参照评估** | 完成（召回 93%，精确率是下界） | [scripts/eval_chart.py](scripts/eval_chart.py) · 结论第 10 节 |
+| **MIDI 渲染测试集** | **可用（精确率是真实数字）** | [scripts/midi_render.py](scripts/midi_render.py) · [midi_eval.py](scripts/midi_eval.py) · 结论第 12 节 |
 | P1 · 通道 A | 原型可用（变体 E） | `odf.channel_a()`，安静段 0 → 2 个音头 |
 
 ## 设计一句话
@@ -84,11 +89,13 @@ Transient Catcher/
 ├── LICENSE                      # MIT
 ├── environment.yml              # conda 环境
 ├── docs/
+│   ├── 00-status.md             # ★ 现状与交接（读这一份就够）
 │   ├── 01-analysis.md           # 现有检测器行为分析
 │   ├── 02-design.md             # 新检测器设计（核心）
 │   ├── 03-validation.md         # 验证计划与 GUI 规格
 │   ├── 04-references.md         # 参考文献
-│   └── 05-p0-results.md         # P0 实测结果（含对我们不利的数据）
+│   ├── 05-p0-results.md         # 全部实测结果 F1–F13（含对我们不利的数据）
+│   └── 06-pitfalls.md           # ★ 踩过的坑（DSP 14 条 + GUI 9 条 + 方法论 6 条）
 ├── src/transient_catcher/       # 检测器
 │   ├── signals.py               # 合成测试信号（P0 用）
 │   ├── dsp.py                   # STFT / 频率重分配 / 对数重 bin / max-filter
@@ -97,6 +104,12 @@ Transient Catcher/
 │   ├── p0_synthetic.py          # P0：合成信号四曲线对照
 │   ├── real_infinity.py         # 真实素材回归（32 分琶音漏检）
 │   ├── eval_chart.py            # 用 osu 谱面当人工 ground truth 做全曲评估
+│   ├── eval_dense.py            # ★ 在含真正密集音符的谱面上评估（检验项目前提）
+│   ├── compare_configs.py       # 横跨三套评估比较配置（改默认值前跑）
+│   ├── midi_demo.py             # 生成示例 MIDI（零外部素材）
+│   ├── midi_render.py           # MIDI -> WAV + 精确真值（三种音色 + GM 打击乐）
+│   ├── midi_eval.py             # 用 MIDI 真值评估（精确率是真实数字）
+│   ├── midi_sweep.py            # 在 MIDI 测试集上扫 channel_a 参数
 │   ├── exp_overlap.py           # overlap 与时间精度实验
 │   ├── bench_gui.py             # GUI 渲染路径基准（合成信号）
 │   ├── bench_gui_real.py        # GUI 逐档压测（真实歌曲，含全曲视野）
@@ -112,6 +125,7 @@ Transient Catcher/
 │   └── audio_io.py              # 音频载入 + RhyDive 曲库扫描
 ├── tests/
 │   └── test_dsp.py              # DSP 自检（重分配符号与量纲）
+├── testdata/                    # MIDI 测试集（可随时删掉重建，不入库）
 └── out/                         # 跑出来的图与指标（不入库）
 ~~~
 

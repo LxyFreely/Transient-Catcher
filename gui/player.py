@@ -46,6 +46,11 @@ class Player(QObject):
         self._stream = None
         self._sink = None
         self._buf = None
+        # 音头提示音（"节拍器"）：播放经过这些时刻就啪一声
+        self._click_times = np.zeros(0, dtype=np.float64)
+        self._click_idx = np.zeros(0, dtype=np.int64)
+        self._click_wave = None
+        self._click_gain = 0.70
         self._timer = QTimer(self)
         self._timer.setInterval(25)
         self._timer.timeout.connect(self._tick)
@@ -72,6 +77,42 @@ class Player(QObject):
         self._samples = np.ascontiguousarray(samples, dtype=np.float32)
         self._sr = int(sr)
         self._dur = len(self._samples) / float(self._sr)
+        self._click_wave = None          # 采样率变了，波形要重建
+        self._rebuild_click_idx()
+
+    # ---------------- 音头提示音 ----------------
+    def set_clicks(self, times, gain=None) -> None:
+        """设置「经过这些时刻就啪一声」的时刻表（秒，绝对时间）。传空即关闭。
+
+        用当前 ODF 变体的检出去打拍子：听到啪声的位置应当和波形上的起音一致，
+        对不上就说明检测偏了 —— 比盯着曲线看快得多。
+        """
+        self._click_times = np.sort(np.asarray(times, dtype=np.float64))
+        if gain is not None and float(gain) != self._click_gain:
+            self._click_gain = float(gain)
+            self._click_wave = None
+        self._rebuild_click_idx()
+
+    def click_count(self) -> int:
+        return int(self._click_times.size)
+
+    def _rebuild_click_idx(self) -> None:
+        """把绝对时刻换算成 _data 里的下标（_data 从 _start 开始）。"""
+        if self._click_times.size == 0:
+            self._click_idx = np.zeros(0, dtype=np.int64)
+            return
+        idx = np.rint((self._click_times - self._start) * self._sr).astype(np.int64)
+        self._click_idx = idx[idx >= 0]
+
+    def _click_waveform(self):
+        if self._click_wave is None:
+            n = max(8, int(0.012 * self._sr))
+            t = np.arange(n) / float(self._sr)
+            w = (np.sin(2.0 * np.pi * 1800.0 * t)
+                 + 0.5 * np.sin(2.0 * np.pi * 3600.0 * t)) * np.exp(-t / 0.0025)
+            w /= max(1e-9, float(np.max(np.abs(w))))
+            self._click_wave = (w * self._click_gain).astype(np.float32)
+        return self._click_wave
 
     # ---------------- sounddevice 后端 ----------------
     def _sd_callback(self, outdata, frames, _time, _status):
@@ -83,6 +124,17 @@ class Player(QObject):
             outdata[:take, 0] = self._data[i:i + take]
         if take < frames:
             outdata[take:, 0] = 0.0
+        if self._click_idx.size:
+            wave = self._click_waveform()
+            lo = int(np.searchsorted(self._click_idx, i))
+            hi = int(np.searchsorted(self._click_idx, i + frames))
+            if hi > lo:
+                for k in self._click_idx[lo:hi]:
+                    s = int(k) - i
+                    if 0 <= s < frames:
+                        m = min(len(wave), frames - s)
+                        outdata[s:s + m, 0] += wave[:m]
+                np.clip(outdata, -1.0, 1.0, out=outdata)
         self._cursor = min(end, n)
 
     def _play_sd(self, start_s: float) -> None:
@@ -114,6 +166,7 @@ class Player(QObject):
         if self._samples is None or len(self._samples) == 0:
             return
         self._start = max(0.0, min(start_s, max(0.0, self._dur - 0.02)))
+        self._rebuild_click_idx()
         try:
             if _HAVE_SD:
                 self._play_sd(self._start)

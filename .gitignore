@@ -6,3 +6,6 @@ __pycache__/
 # 编辑器
 .vscode/
 .idea/
+
+# 生成的测试集与图（可随时删掉重建）
+testdata/

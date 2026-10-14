@@ -52,6 +52,8 @@ def main() -> int:
     ap.add_argument("--shot", help="无头模式：渲染后保存 PNG 并退出")
     ap.add_argument("--t0", type=float, help="视窗起点（秒）")
     ap.add_argument("--t1", type=float, help="视窗终点（秒）")
+    ap.add_argument("--variant", default=None,
+                    help="启动时选中的 ODF 变体，如 E 或 A∩E（多链路取交集）")
     args = ap.parse_args()
 
     app = QApplication(sys.argv)
@@ -64,6 +66,9 @@ def main() -> int:
         win.load_path(src_audio)
     elif args.demo:
         win.load_demo()
+
+    if args.variant and win.analysis is not None:
+        win.variant_box.setCurrentText(args.variant)
 
     if args.t0 is not None and args.t1 is not None:
         win.view.zoom_to(args.t0, args.t1)

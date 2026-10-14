@@ -145,7 +145,7 @@ def rhydive_like(x: np.ndarray, sr: int, hop_ms: float = HOP_MS) -> dict:
 # --------------------------------------------------------------------------
 # E) 通道 A 原型：短窗 + 窄 max-filter + 能量归一化通量 + 全局归一化
 # --------------------------------------------------------------------------
-def channel_a(x: np.ndarray, sr: int, win_ms: float = 16.0, hop_ms: float = HOP_MS,
+def channel_a(x: np.ndarray, sr: int, win_ms: float = 23.0, hop_ms: float = HOP_MS,
               maxfilt: int = 5, per_semitone: int = 4, energy_win_ms: float = 250.0,
               norm_q: float = 0.99, floor: float = 0.20, peak_half: int = 3,
               f_min: float = 65.0, f_max: float = 10000.0,
@@ -154,8 +154,12 @@ def channel_a(x: np.ndarray, sr: int, win_ms: float = 16.0, hop_ms: float = HOP_
 
     四个要点，都是拿真实素材（Infinity Heaven 25–35 s 的 32 分琶音）实测出来的：
 
-    1. **窗要短（16 ms）**。原来 46 ms 的窗和 32 分音符（46.875 ms）同量级，
-       相邻音符在频谱上被抹平，通量自然出不来。
+    1. **窗要短，但不要最短：23 ms**（原来是 16 ms，见 docs/05-p0-results.md F13）。
+       46 ms 的窗和 32 分音符（46.875 ms）同量级，相邻音符在频谱上被抹平；
+       但 16 ms 又太短 —— 512 点窗的 bin 间距有 86 Hz，低音区谐波的旁瓣互相重叠，
+       会让**完全稳态**的长音也逐帧起伏（06-pitfalls A12）。
+       实测 23 ms 在三套评估上**全面不劣于** 16 ms，而且把 S2 音高台阶
+       从"检出 8 个"修正到"检出 1 个"（正确答案）。
     2. **max-filter 要窄（5 格 ≈ 1.25 半音）**。原来 17 格 = 4.25 半音，
        琶音的音程落在窗口内，会被当成"能量本来就在那儿"而抑制掉。
        实测：安静段通量从 98 涨到 432（4.4 倍）。

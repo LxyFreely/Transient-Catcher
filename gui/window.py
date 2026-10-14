@@ -114,12 +114,14 @@ class MainWindow(QMainWindow):
 
         tb.addWidget(QLabel(" ODF 变体 "))
         self.variant_box = QComboBox()
-        self.variant_box.addItems(["A", "B", "C", "D", "E", "F"])
+        self.variant_box.addItems(["A", "B", "C", "D", "E", "F", "A∩E", "A∩E∩F"])
         self.variant_box.setCurrentText("E")
         self.variant_box.setToolTip(
             "A=现有算法  B=逐bin导数(含重分配)  C=B+maxfilter  "
             "D=不重分配+maxfilter  E=通道A原型(短窗+能量归一)  "
-            "F=音高显著性(谐波归组后只跟最响的复音)")
+            "F=音高显著性(谐波归组后只跟最响的复音)\n"
+            "A∩E / A∩E∩F = 多链路取交集：20 ms 内互相印证的峰才保留，"
+            "可大幅压掉过检（见 docs/06-pitfalls.md A16）")
         self.variant_box.currentTextChanged.connect(self._set_variant)
         tb.addWidget(self.variant_box)
 
@@ -158,6 +160,23 @@ class MainWindow(QMainWindow):
         v.addWidget(self.rel_gate)
         v.addWidget(QLabel("峰值须达到±600ms内最大峰的该比例。\n"
                            "调高可压掉延音的假音头，代价是弱音头会漏"))
+
+        v.addSpacing(8)
+        v.addWidget(QLabel("<b>多链路取交集</b>"))
+        v.addWidget(QLabel("变体下拉里的 A∩E / A∩E∩F 就是它。\n"
+                           "不同统计量对真起音响应一致、对衰减拍频各不相同，\n"
+                           "所以 20 ms 内互相印证的峰才保留。\n"
+                           "实测误报能少四成，代价是真阳性少两成"))
+
+        v.addSpacing(8)
+        v.addWidget(QLabel("<b>音头提示音</b>"))
+        self.click_box = QCheckBox("播放时在每个音头处啪一声")
+        self.click_box.setChecked(False)
+        self.click_box.toggled.connect(self._set_click_sound)
+        v.addWidget(self.click_box)
+        v.addWidget(QLabel("用**当前变体**的检出去打拍子。听到啪声的时刻\n"
+                           "应当和波形上的起音一致；对不上就是检测偏了。\n"
+                           "切成 A∩E 再听，能直接听出少了哪些过检"))
 
         v.addSpacing(8)
         v.addWidget(QLabel("<b>复音数上限（变体 F）</b>"))
@@ -227,6 +246,7 @@ class MainWindow(QMainWindow):
                           % (label, sr, len(samples) / sr, len(samples)))
         self.canvas.update()
         self._refresh_time()
+        self._sync_clicks()
         self.statusBar().showMessage("已载入：%s" % label)
 
     def open_file(self):
@@ -297,6 +317,7 @@ class MainWindow(QMainWindow):
 
     def _on_analysis_updated(self):
         self.canvas.invalidate_lanes()
+        self._sync_clicks()          # 音头算完了才推给播放器
         if self.analysis is not None and self.analysis.busy:
             self.statusBar().showMessage("后台计算中… 剩余 %d 项" % self.analysis.busy)
         else:
@@ -326,6 +347,29 @@ class MainWindow(QMainWindow):
         if self.analysis is not None:
             self.analysis.set_odf_variant(text)
         self.canvas.invalidate_lanes()
+        self._sync_clicks()
+
+    # ---------------- 音头提示音 ----------------
+    def _set_click_sound(self, on: bool):
+        self._sync_clicks()
+        if on:
+            self.statusBar().showMessage(
+                "音头提示音：开（变体 %s，%d 个音头）"
+                % (self.variant_box.currentText(), self.player.click_count()))
+        else:
+            self.statusBar().showMessage("音头提示音：关")
+
+    def _sync_clicks(self):
+        """把当前变体的音头时刻推给播放器。
+
+        没算完就推空，等 updated 信号触发时再推一次 —— 不能在这里不推，
+        否则切到还没算过的变体会一直沿用上一个变体的拍子。
+        """
+        if self.analysis is None or not self.click_box.isChecked():
+            self.player.set_clicks(())
+            return
+        t = self.analysis.onset_times(self.variant_box.currentText())
+        self.player.set_clicks(() if t is None else t)
 
     def _set_rel_gate(self, text: str):
         if self.analysis is None:
