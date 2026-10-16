@@ -119,7 +119,7 @@ class Analysis(QObject):
         self.spec_mode = "squeezed"
         self.odf_variant = "D"
         # 通道 A 的可调项（侧栏"峰相对阈值"）——改它只重算 ODF 概览，不碰频谱
-        self.a_opts = {"rel_gamma": 0.30}
+        self.a_opts = {"rel_gamma": 0.30, "adapt_k": 0.25}
         # 变体 F（音高显著性）：复音数上限。实测 >10 会让选择本身不稳定
         self.f_opts = {"n_harm": 8, "top_notes": 10, "rel_gamma": 0.30}
         # 多链路取交集（变体下拉里的 A∩E / A∩E∩F）的匹配容差。
@@ -164,8 +164,24 @@ class Analysis(QObject):
     def set_a_gate(self, gamma: float):
         """改通道 A 的相对峰阈值；只丢掉 ODF 概览缓存，重新后台计算。"""
         self.a_opts["rel_gamma"] = float(gamma)
-        self._ov_odf.pop("E", None)
-        self._submit("ov_odf", lambda: ("E", self._build_ov_odf("E")))
+        self._invalidate_a()
+
+    def set_a_adapt(self, k: float):
+        """改通道 A 的静音抑制强度（专治安静稀疏段的过检）。"""
+        self.a_opts["adapt_k"] = float(k)
+        self._invalidate_a()
+
+    def _invalidate_a(self):
+        """a_opts 变了：**所有**用到通道 A 的缓存都要失效。
+
+        不能只丢 "E" —— 带2/3、带3/3、A∩E、带2/3∩A 全都是通道 A 的派生量，
+        只清 E 会让它们拿旧参数的结果继续显示（实测踩到）。
+        """
+        keep = {"A", "B", "C", "D", "F"}
+        for k in [k for k in self._ov_odf if k not in keep]:
+            del self._ov_odf[k]
+        v = self.odf_variant
+        self._submit("ov_odf", lambda: (v, self._build_ov_odf(v)))
 
     def set_f_notes(self, top_notes: int):
         self.f_opts["top_notes"] = int(top_notes)

@@ -41,6 +41,7 @@ RhyDive 是一款没有谱面的娱乐性音游：玩家对着歌曲的节奏敲
 
 | 你是 | 从这里开始 |
 |---|---|
+| **想直接拿去用 / 提 issue** | **[docs/07-proposal.md](docs/07-proposal.md)** —— 面向 RhyDive 作者的提案，可直接当 issue 正文 |
 | **刚接手 / 上下文被压缩过** | **[docs/00-status.md](docs/00-status.md)** —— 现状、参数、数字、待办，**读这一份就够** |
 | **要改核心结构** | **[docs/06-pitfalls.md](docs/06-pitfalls.md)** —— 先读，每条都是付过时间代价的 |
 | **AI 编码助手** | [AGENTS.md](AGENTS.md) —— 阅读顺序、术语表、接口契约、硬约束 |
@@ -95,7 +96,8 @@ Transient Catcher/
 │   ├── 03-validation.md         # 验证计划与 GUI 规格
 │   ├── 04-references.md         # 参考文献
 │   ├── 05-p0-results.md         # 全部实测结果 F1–F18（含对我们不利的数据）
-│   └── 06-pitfalls.md           # ★ 踩过的坑（DSP 17 条 + GUI 9 条 + 方法论 7 条）
+│   ├── 06-pitfalls.md           # ★ 踩过的坑（DSP 17 条 + GUI 9 条 + 方法论 7 条）
+│   └── 07-proposal.md           # ★ 给 RhyDive 的提案（可直接当 issue 正文）
 ├── src/transient_catcher/       # 检测器
 │   ├── signals.py               # 合成测试信号（P0 用）
 │   ├── dsp.py                   # STFT / 频率重分配 / 对数重 bin / max-filter

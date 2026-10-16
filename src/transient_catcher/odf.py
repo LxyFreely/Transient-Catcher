@@ -149,7 +149,8 @@ def channel_a(x: np.ndarray, sr: int, win_ms: float = 23.0, hop_ms: float = HOP_
               maxfilt: int = 5, per_semitone: int = 4, energy_win_ms: float = 250.0,
               norm_q: float = 0.99, floor: float = 0.20, peak_half: int = 3,
               f_min: float = 65.0, f_max: float = 10000.0,
-              rel_win_ms: float = 600.0, rel_gamma: float = 0.30) -> dict:
+              rel_win_ms: float = 600.0, rel_gamma: float = 0.30,
+              adapt_k: float = 0.25) -> dict:
     """通道 A 原型（P1 的骨干）。
 
     四个要点，都是拿真实素材（Infinity Heaven 25–35 s 的 32 分琶音）实测出来的：
@@ -178,6 +179,14 @@ def channel_a(x: np.ndarray, sr: int, win_ms: float = 23.0, hop_ms: float = HOP_
        绝对下限分不开它们（A 段与 B 段的中位数几乎相同），
        但"相对 ±600 ms 内的最大峰"可以：A 段 6 → 1，同时 S1/S0 不退化。
        代价是 B 段的召回从 3 掉到 2 —— 这个取舍是本质的，不是调参能绕开的。
+
+    6. **静音抑制（adapt_k）**：局部能量低于全曲中位数时，按比例扣掉判定曲线。
+       动因是"**音量小、音符稀疏**的段落会冒出一片过检"。
+       诊断显示那里的误报**强度只有真实音头的一半**（实测 0.34 vs 0.63），
+       而固定下限压不住 —— 抬高全局下限在纯钢琴素材上会亏 0.06 F1。
+       自适应的版本只扣安静帧，实测（k = 0.25）：安静段误报减 56%，
+       夜航星 / Infinity Heaven 的 F1 上升，纯钢琴几乎不动（-0.005）。
+       见 docs/05-p0-results.md F19。
     """
     win = max(128, int(2 ** int(round(float(np.log2(sr * win_ms / 1000.0))))))
     hop = max(1, int(round(sr * hop_ms / 1000.0)))
@@ -199,6 +208,10 @@ def channel_a(x: np.ndarray, sr: int, win_ms: float = 23.0, hop_ms: float = HOP_
     rel = flux / np.maximum(1e-12, e_local)
     scale = float(np.quantile(rel, norm_q)) if rel.size else 1.0
     env = rel / max(1e-12, scale)
+
+    if adapt_k > 0.0 and env.size:
+        e_ref = float(np.median(e_local)) + 1e-12
+        env = np.maximum(0.0, env - adapt_k * np.clip(1.0 - e_local / e_ref, 0.0, 1.0))
 
     if rel_gamma > 0.0 and env.size:
         w = max(1, int(round(rel_win_ms / hop_ms)))

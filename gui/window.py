@@ -165,6 +165,17 @@ class MainWindow(QMainWindow):
                            "调高可压掉延音的假音头，代价是弱音头会漏"))
 
         v.addSpacing(8)
+        v.addWidget(QLabel("<b>静音抑制（通道 A）</b>"))
+        self.adapt_gate = QComboBox()
+        self.adapt_gate.addItems(["关", "0.15", "0.25", "0.35"])
+        self.adapt_gate.setCurrentText("0.25")
+        self.adapt_gate.currentTextChanged.connect(self._set_a_adapt)
+        v.addWidget(self.adapt_gate)
+        v.addWidget(QLabel("局部能量低于全曲中位数时，按该比例扣掉判定曲线。\n"
+                           "专治「音量小、音符稀疏」段落里冒出来的过检。\n"
+                           "实测安静段误报减一半以上；两个素材 F1 上升，纯钢琴几乎不动"))
+
+        v.addSpacing(8)
         v.addWidget(QLabel("<b>多链路取交集</b>"))
         v.addWidget(QLabel("变体下拉里的 A∩E / A∩E∩F 就是它。\n"
                            "不同统计量对真起音响应一致、对衰减拍频各不相同，\n"
@@ -379,6 +390,15 @@ class MainWindow(QMainWindow):
             return
         try:
             self.analysis.set_a_gate(0.0 if text == "关" else float(text))
+        except ValueError:
+            pass
+        self.canvas.invalidate_lanes()
+
+    def _set_a_adapt(self, text: str):
+        if self.analysis is None:
+            return
+        try:
+            self.analysis.set_a_adapt(0.0 if text == "关" else float(text))
         except ValueError:
             pass
         self.canvas.invalidate_lanes()
