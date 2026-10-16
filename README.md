@@ -39,6 +39,12 @@ RhyDive 是一款没有谱面的娱乐性音游：玩家对着歌曲的节奏敲
 
 ## 读者指引
 
+> ⚠ **谱面评估的分辨力很有限**（[06-pitfalls](docs/06-pitfalls.md) C8 / [F20](docs/05-p0-results.md)）：
+> Infinity Heaven 谱面 4.6 音/秒、检测器输出 11.3 个/秒，
+> **同密度随机撒点就能拿 73% 召回、30% 精确**，A 与 E 的谱面精确率完全相同（38%）。
+> 引用谱面数字时必须连同随机基线一起报（[`eval_chart.py`](scripts/eval_chart.py) 会自动打印「有效空间」）。
+
+
 | 你是 | 从这里开始 |
 |---|---|
 | **想直接拿去用 / 提 issue** | **[docs/07-proposal.md](docs/07-proposal.md)** —— 面向 RhyDive 作者的提案，可直接当 issue 正文 |
@@ -48,7 +54,7 @@ RhyDive 是一款没有谱面的娱乐性音游：玩家对着歌曲的节奏敲
 | 想看问题定义 | [docs/01-analysis.md](docs/01-analysis.md) |
 | 想看方案 | [docs/02-design.md](docs/02-design.md) |
 | 想自己验证 | [docs/03-validation.md](docs/03-validation.md) |
-| 想看全部实测数据 | [docs/05-p0-results.md](docs/05-p0-results.md)（F1–F18） |
+| 想看全部实测数据 | [docs/05-p0-results.md](docs/05-p0-results.md)（F1–F20） |
 | 想看文献依据 | [docs/04-references.md](docs/04-references.md) |
 
 ## 当前状态
@@ -61,14 +67,13 @@ RhyDive 是一款没有谱面的娱乐性音游：玩家对着歌曲的节奏敲
 | 验证与 GUI 计划 | 完成 | [docs/03-validation.md](docs/03-validation.md) |
 | 参考文献 | 完成 | [docs/04-references.md](docs/04-references.md) |
 | **P0 · 合成信号对照** | **完成** | [scripts/p0_synthetic.py](scripts/p0_synthetic.py) · 结果与结论 [docs/05-p0-results.md](docs/05-p0-results.md) |
-| P1 · 通道 A（瞬态） | 未开始 | — |
-| P2 · 通道 B（谱峰追踪） | 未开始 | — |
-| P3 · 融合 | 未开始 | — |
+| P1 · 通道 A（瞬态） | **原型可用** | `odf.channel_a()`，变体 E/F |
+| P2 · 通道 B（谱峰追踪） | 未开始 | 现在有四条独立证据都指向它（F12.4 / F12.6 / F13 / A15） |
+| P3 · 融合 | **部分完成** | 多链路取交集 + 频带多数投票（F18），比原计划的「两通道融合」更窄 |
 | **P4 · 测试 GUI** | **可用** | [gui/](gui/) · 规格 [docs/03-validation.md](docs/03-validation.md) 第 4 节 |
 | **真实素材回归** | **已暴露关键缺陷** | [scripts/real_infinity.py](scripts/real_infinity.py) · 结论 [docs/05-p0-results.md](docs/05-p0-results.md) 第 8 节 |
-| **谱面参照评估** | 完成（召回 93%，精确率是下界） | [scripts/eval_chart.py](scripts/eval_chart.py) · 结论第 10 节 |
+| **谱面参照评估** | 完成（召回 92%，精确率是下界） | [scripts/eval_chart.py](scripts/eval_chart.py) · 结论第 10 节 |
 | **MIDI 渲染测试集** | **可用（精确率是真实数字）** | [scripts/midi_render.py](scripts/midi_render.py) · [midi_eval.py](scripts/midi_eval.py) · 结论第 12 节 |
-| P1 · 通道 A | 原型可用（变体 E） | `odf.channel_a()`，安静段 0 → 2 个音头 |
 
 ## 设计一句话
 
@@ -96,7 +101,7 @@ Transient Catcher/
 │   ├── 03-validation.md         # 验证计划与 GUI 规格
 │   ├── 04-references.md         # 参考文献
 │   ├── 05-p0-results.md         # 全部实测结果 F1–F18（含对我们不利的数据）
-│   ├── 06-pitfalls.md           # ★ 踩过的坑（DSP 17 条 + GUI 9 条 + 方法论 7 条）
+│   ├── 06-pitfalls.md           # ★ 踩过的坑（DSP 18 条 + GUI 11 条 + 方法论 7 条）
 │   └── 07-proposal.md           # ★ 给 RhyDive 的提案（可直接当 issue 正文）
 ├── src/transient_catcher/       # 检测器
 │   ├── signals.py               # 合成测试信号（P0 用）

@@ -116,7 +116,10 @@ class MainWindow(QMainWindow):
         self.variant_box = QComboBox()
         self.variant_box.addItems(["A", "B", "C", "D", "E", "F",
                                    "A∩E", "A∩E∩F", "带2/3", "带2/3∩A"])
-        self.variant_box.setCurrentText("E")
+        # 默认用「带2/3∩A」：完整 MIDI 真值下 90% 精确 / 69% 召回，F0.5 = 0.849，
+        # 优于 A（0.693）与 带2/3 单独（0.806）。过检在这个游戏里比漏检致命得多，
+        # 所以按 F0.5 选它（见 docs/05-p0-results.md F22）。
+        self.variant_box.setCurrentText("带2/3∩A")
         self.variant_box.setToolTip(
             "A=现有算法  B=逐bin导数(含重分配)  C=B+maxfilter  "
             "D=不重分配+maxfilter  E=通道A原型(短窗+能量归一)  "
@@ -124,7 +127,9 @@ class MainWindow(QMainWindow):
             "A∩E / A∩E∩F = 多链路取交集：20 ms 内互相印证的峰才保留，"
             "可大幅压掉过检（见 docs/06-pitfalls.md A16）\n"
             "带2/3 / 带2/3∩A = 按频带特化：低/中/高三条带各跑一遍，"
-            "两条以上同意才保留（见 F18，目前 F1 最高的一组）")
+            "两条以上同意才保留（见 F18）\n"
+            "★ 默认的 带2/3∩A 是目前推荐档：精确 65%→90%，代价是召回 94%→69%。"
+            "过检会让玩家乱按也判、排行榜失效，所以这个取舍划算（见 F22）")
         self.variant_box.currentTextChanged.connect(self._set_variant)
         tb.addWidget(self.variant_box)
 
@@ -167,8 +172,8 @@ class MainWindow(QMainWindow):
         v.addSpacing(8)
         v.addWidget(QLabel("<b>静音抑制（通道 A）</b>"))
         self.adapt_gate = QComboBox()
-        self.adapt_gate.addItems(["关", "0.15", "0.25", "0.35"])
-        self.adapt_gate.setCurrentText("0.25")
+        self.adapt_gate.addItems(["关", "0.05", "0.10", "0.15", "0.25", "0.35"])
+        self.adapt_gate.setCurrentText("0.10")
         self.adapt_gate.currentTextChanged.connect(self._set_a_adapt)
         v.addWidget(self.adapt_gate)
         v.addWidget(QLabel("局部能量低于全曲中位数时，按该比例扣掉判定曲线。\n"
@@ -243,11 +248,15 @@ class MainWindow(QMainWindow):
 
     def _adopt(self, samples, sr, label) -> None:
         self.player.load(samples, sr)
-        self.analysis = Analysis(samples, sr)
+        # 把工具栏当前选中的变体**传进构造函数**，并在下面再同步一次图层 ——
+        # 从前 Analysis 用自己写死的默认值，下拉框与实算不一致（06-pitfalls B11）。
+        self.analysis = Analysis(samples, sr, variant=self.variant_box.currentText())
         self.analysis.updated.connect(self._on_analysis_updated)
         self.view.set_total(len(samples) / float(sr))
         self.cur_label = label
         self.canvas.set_analysis(self.analysis)
+        # 再同步一次图层（构造函数只保证 Analysis 内部一致，图层是另一份状态）
+        self._set_variant(self.variant_box.currentText())
         # 试图从 RhyDive 曲库自动匹配谱面，作为人工 ground truth 参考
         m = auto_match(label)
         if m is not None:

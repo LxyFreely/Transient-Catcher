@@ -70,6 +70,19 @@ win.load_demo()
 print("   演示信号          : 时长 %.2f s，视窗 %.2f–%.2f s"
       % (win.view.total, win.view.t0, win.view.t1))
 
+# ---- 下拉框显示的变体必须等于 Analysis 实算的变体 ----
+# 这条曾经不成立：Analysis 用构造函数里写死的默认值，_adopt 从不覆盖它，
+# 于是界面显示 带2/3∩A 而实算的是另一个变体（06-pitfalls B11）。
+shown = win.variant_box.currentText()
+actual = win.analysis.odf_variant
+assert shown == actual, "下拉框显示 %r，但 Analysis 实算 %r" % (shown, actual)
+print("5. 变体同步         : 下拉框 %r == 实算 %r  ok" % (shown, actual))
+win.variant_box.setCurrentText("A")
+assert win.analysis.odf_variant == "A", "切换后未同步：%r" % win.analysis.odf_variant
+win.variant_box.setCurrentText(shown)
+assert win.analysis.odf_variant == shown
+print("   切换同步         : ok（切到 A 后实算也变成 A，再切回来）")
+
 songs = scan_rhydive_library()
 print("4. RhyDive 本地曲库 : 扫到 %d 首" % len(songs))
 for s in songs[:8]:

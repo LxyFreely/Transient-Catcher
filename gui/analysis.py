@@ -111,15 +111,18 @@ class _FineWorker(QThread):
 class Analysis(QObject):
     updated = Signal()
 
-    def __init__(self, samples, sr: int, parent=None):
+    def __init__(self, samples, sr: int, parent=None, variant: str = "D"):
         super().__init__(parent)
         self.samples = np.ascontiguousarray(samples, dtype=np.float64)
         self.sr = int(sr)
         self.total = len(self.samples) / float(self.sr)
         self.spec_mode = "squeezed"
-        self.odf_variant = "D"
+        # 默认变体。注意：**必须由调用方传入工具栏当前选中的值** ——
+        # 从前这里写死 "D"，而 _adopt 从不覆盖它，于是下拉框显示的和实算的
+        # 是两个变体（显示 带2/3∩A、实算 D）。见 06-pitfalls B11。
+        self.odf_variant = str(variant)
         # 通道 A 的可调项（侧栏"峰相对阈值"）——改它只重算 ODF 概览，不碰频谱
-        self.a_opts = {"rel_gamma": 0.30, "adapt_k": 0.25}
+        self.a_opts = {"rel_gamma": 0.30, "adapt_k": 0.10}
         # 变体 F（音高显著性）：复音数上限。实测 >10 会让选择本身不稳定
         self.f_opts = {"n_harm": 8, "top_notes": 10, "rel_gamma": 0.30}
         # 多链路取交集（变体下拉里的 A∩E / A∩E∩F）的匹配容差。

@@ -91,7 +91,20 @@ def peak_pick(env: np.ndarray, hop_ms: float, centre_ms: float,
 # --------------------------------------------------------------------------
 # A) 现有检测器（独立重实现）
 # --------------------------------------------------------------------------
-def rhydive_like(x: np.ndarray, sr: int, hop_ms: float = HOP_MS) -> dict:
+def rhydive_like(x: np.ndarray, sr: int, hop_ms: float = HOP_MS,
+                 peak_floor: float = PEAK_FLOOR, peak_half: int = PEAK_HALF,
+                 reg_gap_ms: float = REG_GAP_MS, merge_ms: float = MERGE_MS,
+                 quantile: float = QUANTILE, local_ms: float = LOCAL_MS,
+                 flux_step: int = 2) -> dict:
+    """独立重实现的现有检测器。默认值与历史记录一致（不传参时行为不变）。
+
+    **灵敏度旋钮**（用于「把 A 调灵敏，再和 带2/3 取交集」这条路线，
+    见 docs/05-p0-results.md F22）：
+      - reg_gap_ms：同音区最小峰间距，**密集段召回的主瓶颈**（55 → 越小越灵敏）
+      - peak_floor：峰值下限（0.15 → 越小越灵敏）
+      - merge_ms：跨音区合并窗（30 → 越小越灵敏）
+      - quantile：归一化分位（0.9 → 越大越灵敏，同时多放进来弱峰）
+    """
     win, hop = _win_hop(sr, hop_ms=hop_ms)
     X, _ = dsp.stft(x, win, hop)
     mag = np.abs(X)
@@ -113,11 +126,13 @@ def rhydive_like(x: np.ndarray, sr: int, hop_ms: float = HOP_MS) -> dict:
     for r, (lo_f, hi_f) in enumerate(REGISTERS):
         reg[(centers >= lo_f) & (centers < hi_f)] = r
 
+    st = max(1, int(flux_step))
     flux = np.zeros(n_frames)
-    flux[2:] = np.maximum(0.0, band[2:] - band[:-2]).sum(axis=1)
+    flux[st:] = np.maximum(0.0, band[st:] - band[:-st]).sum(axis=1)
 
     centre_ms = win / 2.0 / sr * 1000.0
-    env_total, _ = adaptive_threshold(flux, hop_ms, floor=1.0)
+    env_total, _ = adaptive_threshold(flux, hop_ms, floor=1.0, quantile=quantile,
+                                      local_ms=local_ms)
 
     onsets = []
     for r in range(len(REGISTERS)):
@@ -125,14 +140,16 @@ def rhydive_like(x: np.ndarray, sr: int, hop_ms: float = HOP_MS) -> dict:
         if cols.size == 0:
             continue
         f = np.zeros(n_frames)
-        f[2:] = np.maximum(0.0, band[2:][:, cols] - band[:-2][:, cols]).sum(axis=1)
-        env_r, _ = adaptive_threshold(f, hop_ms, floor=float(cols.size) / BANDS)
-        onsets.extend(peak_pick(env_r, hop_ms, centre_ms, min_gap_ms=REG_GAP_MS))
+        f[st:] = np.maximum(0.0, band[st:][:, cols] - band[:-st][:, cols]).sum(axis=1)
+        env_r, _ = adaptive_threshold(f, hop_ms, floor=float(cols.size) / BANDS,
+                                      quantile=quantile, local_ms=local_ms)
+        onsets.extend(peak_pick(env_r, hop_ms, centre_ms, floor=peak_floor,
+                                half=peak_half, min_gap_ms=reg_gap_ms))
 
     onsets.sort(key=lambda p: (p[0], -p[1]))
     merged = []
     for t, s in onsets:
-        if merged and t - merged[-1][0] < MERGE_MS:
+        if merged and t - merged[-1][0] < merge_ms:
             if s > merged[-1][1]:
                 merged[-1] = (t, s)
         else:
@@ -150,7 +167,7 @@ def channel_a(x: np.ndarray, sr: int, win_ms: float = 23.0, hop_ms: float = HOP_
               norm_q: float = 0.99, floor: float = 0.20, peak_half: int = 3,
               f_min: float = 65.0, f_max: float = 10000.0,
               rel_win_ms: float = 600.0, rel_gamma: float = 0.30,
-              adapt_k: float = 0.25) -> dict:
+              adapt_k: float = 0.10) -> dict:
     """通道 A 原型（P1 的骨干）。
 
     四个要点，都是拿真实素材（Infinity Heaven 25–35 s 的 32 分琶音）实测出来的：
@@ -184,8 +201,10 @@ def channel_a(x: np.ndarray, sr: int, win_ms: float = 23.0, hop_ms: float = HOP_
        动因是"**音量小、音符稀疏**的段落会冒出一片过检"。
        诊断显示那里的误报**强度只有真实音头的一半**（实测 0.34 vs 0.63），
        而固定下限压不住 —— 抬高全局下限在纯钢琴素材上会亏 0.06 F1。
-       自适应的版本只扣安静帧，实测（k = 0.25）：安静段误报减 56%，
-       夜航星 / Infinity Heaven 的 F1 上升，纯钢琴几乎不动（-0.005）。
+       **但这是个取舍**：k 越大，安静段里"其实是真的、只是弱"的音头也会被扣掉。
+       实测有一条悬崖：k <= 0.10 时纯钢琴曲的安静段召回完全不动（38% -> 37%），
+       k = 0.15 就掉到 32%。所以默认取 **0.10** —— 三个素材的 F1 都上升或不降，
+       安静段误报仍减 25%。噪声重、动态大的歌可以在 GUI 里调到 0.25 / 0.35。
        见 docs/05-p0-results.md F19。
     """
     win = max(128, int(2 ** int(round(float(np.log2(sr * win_ms / 1000.0))))))
