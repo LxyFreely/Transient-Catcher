@@ -114,14 +114,17 @@ class MainWindow(QMainWindow):
 
         tb.addWidget(QLabel(" ODF 变体 "))
         self.variant_box = QComboBox()
-        self.variant_box.addItems(["A", "B", "C", "D", "E", "F", "A∩E", "A∩E∩F"])
+        self.variant_box.addItems(["A", "B", "C", "D", "E", "F",
+                                   "A∩E", "A∩E∩F", "带2/3", "带2/3∩A"])
         self.variant_box.setCurrentText("E")
         self.variant_box.setToolTip(
             "A=现有算法  B=逐bin导数(含重分配)  C=B+maxfilter  "
             "D=不重分配+maxfilter  E=通道A原型(短窗+能量归一)  "
             "F=音高显著性(谐波归组后只跟最响的复音)\n"
             "A∩E / A∩E∩F = 多链路取交集：20 ms 内互相印证的峰才保留，"
-            "可大幅压掉过检（见 docs/06-pitfalls.md A16）")
+            "可大幅压掉过检（见 docs/06-pitfalls.md A16）\n"
+            "带2/3 / 带2/3∩A = 按频带特化：低/中/高三条带各跑一遍，"
+            "两条以上同意才保留（见 F18，目前 F1 最高的一组）")
         self.variant_box.currentTextChanged.connect(self._set_variant)
         tb.addWidget(self.variant_box)
 

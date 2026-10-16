@@ -47,7 +47,7 @@ RhyDive 是一款没有谱面的娱乐性音游：玩家对着歌曲的节奏敲
 | 想看问题定义 | [docs/01-analysis.md](docs/01-analysis.md) |
 | 想看方案 | [docs/02-design.md](docs/02-design.md) |
 | 想自己验证 | [docs/03-validation.md](docs/03-validation.md) |
-| 想看全部实测数据 | [docs/05-p0-results.md](docs/05-p0-results.md)（F1–F13） |
+| 想看全部实测数据 | [docs/05-p0-results.md](docs/05-p0-results.md)（F1–F18） |
 | 想看文献依据 | [docs/04-references.md](docs/04-references.md) |
 
 ## 当前状态
@@ -94,8 +94,8 @@ Transient Catcher/
 │   ├── 02-design.md             # 新检测器设计（核心）
 │   ├── 03-validation.md         # 验证计划与 GUI 规格
 │   ├── 04-references.md         # 参考文献
-│   ├── 05-p0-results.md         # 全部实测结果 F1–F13（含对我们不利的数据）
-│   └── 06-pitfalls.md           # ★ 踩过的坑（DSP 14 条 + GUI 9 条 + 方法论 6 条）
+│   ├── 05-p0-results.md         # 全部实测结果 F1–F18（含对我们不利的数据）
+│   └── 06-pitfalls.md           # ★ 踩过的坑（DSP 17 条 + GUI 9 条 + 方法论 7 条）
 ├── src/transient_catcher/       # 检测器
 │   ├── signals.py               # 合成测试信号（P0 用）
 │   ├── dsp.py                   # STFT / 频率重分配 / 对数重 bin / max-filter

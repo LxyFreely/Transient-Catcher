@@ -24,6 +24,9 @@ from transient_catcher import dsp, odf
 
 PAD_MAX_S = 0.35
 OV_SPEC_COLS = 6000      # 概览列数：调大可以减少"中等缩放"回退到精算的次数
+# 按频带特化用的三个频带（Hz）。见 docs/05-p0-results.md F18：
+# 中频带单独一个就比全带 E 精确率高 23/11/14 个点，低频带与高频带贡献的几乎都是误报。
+BAND_EDGES = ((65.0, 600.0), (600.0, 2500.0), (2500.0, 10000.0))
 OV_SPEC_ROWS = 256
 OV_ENV_BUCKETS = 4000
 ODF_HOP_MS = 10.0
@@ -287,10 +290,17 @@ class Analysis(QObject):
         return None if img is None else self._normalize(img)
 
     def _build_ov_odf(self, variant: str):
+        if variant in ("带2/3", "带3/3"):
+            return self._build_band_vote(need=2 if variant == "带2/3" else 3)
         if "∩" in variant:
             return self._build_intersection(variant)
         sr = self.sr
-        if variant == "A":
+        if variant.startswith("E:"):
+            # "E:下限:上限" —— 同一套参数只换频带范围
+            _tag, lo, hi = variant.split(":")
+            r = odf.channel_a(self.samples, sr, hop_ms=ODF_HOP_MS,
+                              f_min=float(lo), f_max=float(hi), **self.a_opts)
+        elif variant == "A":
             r = odf.rhydive_like(self.samples, sr, hop_ms=ODF_HOP_MS)
         elif variant == "B":
             r = odf.perbin(self.samples, sr, use_reassign=True, maxfilt=None,
@@ -334,6 +344,45 @@ class Analysis(QObject):
                 break
             keep = keep[self._near(d, keep, self.intersect_tol_ms / 1000.0)]
         return (env_ts, env, keep)
+
+    def _build_band_vote(self, need: int = 2):
+        """按频带特化 + 多数投票（变体「带2/3」「带3/3」）。
+
+        同一条 channel_a 用三个频带各跑一遍再取多数。数据见
+        docs/05-p0-results.md F18：三带 2/3 再和 A 取交集，
+        把真实音乐上的 F1 从 0.54-0.55 推到 0.66-0.68。
+
+        **权威率不要调高**：3/3 全一致会把召回砍到 20-50%，平均 F1 反而更低。
+        """
+        dets, env_ts, env = [], None, None
+        for lo, hi in BAND_EDGES:
+            ts, e, d = self._build_ov_odf("E:%g:%g" % (lo, hi))
+            dets.append(d)
+            if env is None:
+                env_ts, env = ts, e
+        tol = self.intersect_tol_ms / 1000.0
+        out = []
+        for d in dets:
+            for t in d:
+                cnt = 0
+                for b in dets:
+                    if b.size and (np.searchsorted(b, t + tol, "right")
+                                   > np.searchsorted(b, t - tol)):
+                        cnt += 1
+                if cnt >= need:
+                    out.append(float(t))
+        return (env_ts, env, self._cluster_times(out, tol))
+
+    @staticmethod
+    def _cluster_times(times, tol):
+        a = np.sort(np.asarray(times, dtype=np.float64))
+        if a.size == 0 or tol <= 0.0:
+            return a
+        keep = [float(a[0])]
+        for v in a[1:]:
+            if v - keep[-1] > tol:
+                keep.append(float(v))
+        return np.asarray(keep)
 
     @staticmethod
     def _near(ref, a, tol):
