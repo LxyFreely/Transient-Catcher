@@ -53,7 +53,7 @@ def main() -> int:
     ap.add_argument("--t0", type=float, help="视窗起点（秒）")
     ap.add_argument("--t1", type=float, help="视窗终点（秒）")
     ap.add_argument("--variant", default=None,
-                    help="启动时选中的 ODF 变体，如 E 或 A∩E（多链路取交集）")
+                    help="启动时选中的 ODF 变体，默认 带2/3∩A；也可指定 A / E / A∩E 等")
     args = ap.parse_args()
 
     app = QApplication(sys.argv)

@@ -265,7 +265,7 @@ python gui/main.py --audio testdata/antikythera.wav --shot out/a.png --t0 146.5 
 | 方案设计与「被否决的方案」 | [docs/02-design.md](02-design.md) |
 | **踩过的坑（改结构前必读）** | [docs/06-pitfalls.md](06-pitfalls.md) |
 | **评估方法本身的局限（必读）** | [docs/06-pitfalls.md](06-pitfalls.md) C8 —— 谱面评估在稀疏谱面上接近失效 |
-| 全部实测数据 F1–F22 | [docs/05-p0-results.md](05-p0-results.md) |
+| 全部实测数据 F1–F23 | [docs/05-p0-results.md](05-p0-results.md) |
 | 验证计划与 GUI 规格 | [docs/03-validation.md](03-validation.md) |
 | 文献依据 | [docs/04-references.md](04-references.md) |
 

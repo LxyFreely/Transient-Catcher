@@ -68,7 +68,7 @@ RhyDive 是一款没有谱面的娱乐性音游：玩家对着歌曲的节奏敲
 | 参考文献 | 完成 | [docs/04-references.md](docs/04-references.md) |
 | **P0 · 合成信号对照** | **完成** | [scripts/p0_synthetic.py](scripts/p0_synthetic.py) · 结果与结论 [docs/05-p0-results.md](docs/05-p0-results.md) |
 | P1 · 通道 A（瞬态） | **原型可用** | `odf.channel_a()`，变体 E/F |
-| P2 · 通道 B（谱峰追踪） | 未开始 | 现在有四条独立证据都指向它（F12.4 / F12.6 / F13 / A15） |
+| P2 · 通道 B（谱峰追踪） | 未开始 | 五条证据都指向它（F12.4 / F12.6 / F13 / A15 / **F22**）；F22 给了可量化目标：候选垃圾率 18% → 5%、召回不掉 |
 | P3 · 融合 | **部分完成** | 多链路取交集 + 频带多数投票（F18），比原计划的「两通道融合」更窄 |
 | **P4 · 测试 GUI** | **可用** | [gui/](gui/) · 规格 [docs/03-validation.md](docs/03-validation.md) 第 4 节 |
 | **真实素材回归** | **已暴露关键缺陷** | [scripts/real_infinity.py](scripts/real_infinity.py) · 结论 [docs/05-p0-results.md](docs/05-p0-results.md) 第 8 节 |
@@ -101,7 +101,7 @@ Transient Catcher/
 │   ├── 03-validation.md         # 验证计划与 GUI 规格
 │   ├── 04-references.md         # 参考文献
 │   ├── 05-p0-results.md         # 全部实测结果 F1–F18（含对我们不利的数据）
-│   ├── 06-pitfalls.md           # ★ 踩过的坑（DSP 18 条 + GUI 11 条 + 方法论 7 条）
+│   ├── 06-pitfalls.md           # ★ 踩过的坑（DSP 18 条 + GUI 11 条 + 方法论 8 条）
 │   └── 07-proposal.md           # ★ 给 RhyDive 的提案（可直接当 issue 正文）
 ├── src/transient_catcher/       # 检测器
 │   ├── signals.py               # 合成测试信号（P0 用）

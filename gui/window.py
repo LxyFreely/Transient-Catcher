@@ -178,7 +178,8 @@ class MainWindow(QMainWindow):
         v.addWidget(self.adapt_gate)
         v.addWidget(QLabel("局部能量低于全曲中位数时，按该比例扣掉判定曲线。\n"
                            "专治「音量小、音符稀疏」段落里冒出来的过检。\n"
-                           "实测安静段误报减一半以上；两个素材 F1 上升，纯钢琴几乎不动"))
+                           "默认 0.10：三套素材 F1 都上升或持平，安静段误报减 25%。\n"
+                           "**别调过 0.15** —— 纯钢琴曲的安静密集段会掉召回（F19）"))
 
         v.addSpacing(8)
         v.addWidget(QLabel("<b>多链路取交集</b>"))
